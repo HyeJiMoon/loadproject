@@ -13,7 +13,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.util.Vector;
 
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
@@ -23,6 +26,9 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
+import javax.swing.table.TableModel;
 
 import org.apache.poi.hssf.usermodel.HSSFCell;
 import org.apache.poi.hssf.usermodel.HSSFRow;
@@ -30,7 +36,7 @@ import org.apache.poi.hssf.usermodel.HSSFSheet;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.DataFormatter;
 
-public class LoadMain extends JFrame implements ActionListener{
+public class LoadMain extends JFrame implements ActionListener, TableModelListener{
 	JPanel p_north;
 	JTextField t_path;
 	JButton bt_open, bt_load ,bt_excel, bt_del;
@@ -43,8 +49,12 @@ public class LoadMain extends JFrame implements ActionListener{
 	//윈도우창이 열리면 이미 접속을 확보해놓자 . 
 	DBManager manager=DBManager.getInstance();  //둘다 최초에 올려놔져야해 접속!!!!!!!!!!!!! 가능가능
 	Connection con;
-	PreparedStatement pstmt=null;  //객체당하나
+	PreparedStatement pstmt; //객체당 하나
+	Vector<Vector> list;
+	Vector columnName;
+	MyModel myModel;
 	
+
 	public LoadMain() {
 		p_north=new JPanel();
 		t_path=new JTextField(20);
@@ -53,7 +63,7 @@ public class LoadMain extends JFrame implements ActionListener{
 		bt_excel=new JButton("엑셀로드");
 		bt_del=new JButton("삭제하기");
 	
-		table =new JTable();
+		table =new JTable(); //JTable은 편집이가능한 기능이있지만 tablemodel 을 사용하면 편집기능까지 tablemodel이 책임져야해
 		scroll = new JScrollPane(table);
 		chooser=new JFileChooser("C:/animal");
 		
@@ -84,6 +94,7 @@ public class LoadMain extends JFrame implements ActionListener{
 			}
 			
 		});
+	
 		
 		setVisible(true);
 		setSize(800, 600);
@@ -95,6 +106,7 @@ public class LoadMain extends JFrame implements ActionListener{
 	//DB연동 Connection 얻어다 놓기
 	private void init() {
 		con=manager.getConnection();
+		
 		
 	}
 	//파일 탐색기 띄우기
@@ -145,7 +157,7 @@ public class LoadMain extends JFrame implements ActionListener{
 				//value[0] //=seq라인
 				//seq줄을 제외하고 insert 하겠다
 				if(!value[0].equals("seq")){
-					sb.append("insert into hospital(seq,name,addr,regdate,status,dimension,type)");
+					sb.append("insert into hospital(name,addr,regdate,status,dimension,type,seq)");
 					sb.append(" values("+value[0]+",'"+value[1]+"','"+value[2]+"','"+value[3]+"','"+value[4]+"',"+value[5]+",'"+value[6]+"')");
 					
 					System.out.println(sb.toString());
@@ -159,6 +171,14 @@ public class LoadMain extends JFrame implements ActionListener{
 				}	
 			}
 			JOptionPane.showMessageDialog(this, "migration 완료");
+			
+			//JTable 나오게 처리
+			getList();
+			table.setModel(new MyModel(list, columnName));
+			//테이블모델과 리스너와의 연결 - JTable 은 현재 쓰고 있는 자신의 tablemodel을 반환해준다 ... 타이밍상 mymodel을 결정하고 리스너를 연결해야 가능하다
+			table.getModel().addTableModelListener(this);
+			table.updateUI();
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (SQLException e) { //pstmt=con.prepareStatement(sb.toString()); 여기서 온 try/catch 코드 지저분해지니까 ㅣㅁㅌ으로 
@@ -209,6 +229,7 @@ public class LoadMain extends JFrame implements ActionListener{
 				int total=sheet.getLastRowNum();  // 길어지니까
 				DataFormatter df=new DataFormatter(); //숫자와 문자 공존인데 자료형에 국한되지않음! 
 				
+				//for 문안에서 반복문쓰기
 				for(int a=1;a<=total;a++){
 					HSSFRow row=sheet.getRow(a);
 					int columnCount=row.getLastCellNum(); //컬럼의 갯수가 몇개니?
@@ -234,6 +255,65 @@ public class LoadMain extends JFrame implements ActionListener{
 			}
 		}
 	}
+	//모든 레코드 가져오기 
+	public void getList(){
+		String sql="select * from hospital order by seq asc";
+		PreparedStatement pstmt=null;
+		ResultSet rs=null;
+		
+		try {
+			pstmt=con.prepareStatement(sql);
+			rs=pstmt.executeQuery();
+			
+			//컬럼명도 추출
+			ResultSetMetaData meta=rs.getMetaData();
+			int count=meta.getColumnCount();
+			columnName=new Vector();
+			
+			for(int i=0; i<count;i++){
+				columnName.add(meta.getColumnName(i+1));
+				
+			}
+			
+			list = new Vector<Vector>(); //이차원 벡터가 될 예정 
+			while(rs.next()){ //커서 한칸 전진
+		 
+				Vector vec = new Vector(); //레코드 1건 담을 것 -> DTO 는 JTable 지원 X
+			
+				vec.add(rs.getString("seq"));
+				vec.add(rs.getString("name"));
+				vec.add(rs.getString("addr"));
+				vec.add(rs.getString("regdate"));
+				vec.add(rs.getString("status"));
+				vec.add(rs.getString("dimension"));
+				vec.add(rs.getString("type"));
+				
+				list.add(vec);
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			if(rs!=null){
+				try {
+					rs.close();
+					
+				} catch (SQLException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+			if(pstmt!=null){
+				try {
+					pstmt.close();
+				} catch (SQLException e) {
+				
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+	
+	
 	//선택한 레코드 삭제 
 	public void delete(){
 		
@@ -254,9 +334,16 @@ public class LoadMain extends JFrame implements ActionListener{
 			delete();
 		}
 	}
+	//테이블 모델의 데이터 값에 변경이 발생하면, 그 찰나를 감지하는 리스너 
+	@Override
+	public void tableChanged(TableModelEvent e) {
+		System.out.println("나바꿨어?");
+	}
+	
 	
 	public static void main(String[] args) {
 		new LoadMain();
 	}
+
 
 }
