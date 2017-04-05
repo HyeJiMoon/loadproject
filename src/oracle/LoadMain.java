@@ -54,6 +54,8 @@ public class LoadMain extends JFrame implements ActionListener, TableModelListen
 	Vector columnName;
 	MyModel myModel;
 	
+	String data;
+	StringBuffer sb=new StringBuffer();
 
 	public LoadMain() {
 		p_north=new JPanel();
@@ -143,8 +145,6 @@ public class LoadMain extends JFrame implements ActionListener, TableModelListen
 		//버퍼스트림을 이용하여 CSV의 데이터를 1줄씩 읽어들여 insert 시키자 
 		//레코드가 없을 때 까지! 
 		//while 문으로 돌리면 너무 빠르므로, 네트워크가 감당할 수 없기 때문에 일부러 지연시키면서!
-		String data;
-		StringBuffer sb=new StringBuffer();
 		
 		
 		
@@ -157,7 +157,7 @@ public class LoadMain extends JFrame implements ActionListener, TableModelListen
 				//value[0] //=seq라인
 				//seq줄을 제외하고 insert 하겠다
 				if(!value[0].equals("seq")){
-					sb.append("insert into hospital(name,addr,regdate,status,dimension,type,seq)");
+					sb.append("insert into hospital(seq,name,addr,regdate,status,dimension,type)");
 					sb.append(" values("+value[0]+",'"+value[1]+"','"+value[2]+"','"+value[3]+"','"+value[4]+"',"+value[5]+",'"+value[6]+"')");
 					
 					System.out.println(sb.toString());
@@ -175,7 +175,7 @@ public class LoadMain extends JFrame implements ActionListener, TableModelListen
 			//JTable 나오게 처리
 			getList();
 			table.setModel(new MyModel(list, columnName));
-			//테이블모델과 리스너와의 연결 - JTable 은 현재 쓰고 있는 자신의 tablemodel을 반환해준다 ... 타이밍상 mymodel을 결정하고 리스너를 연결해야 가능하다
+			//테이블모델과 리스너와의 연결 - JTable 은 현재 쓰고 있는 자신의 tablemodel을 반환해준다 ... 타이밍상 mymodel을 결정하고 리스너를 연결해야 가능하따! 
 			table.getModel().addTableModelListener(this);
 			table.updateUI();
 			
@@ -215,8 +215,6 @@ public class LoadMain extends JFrame implements ActionListener, TableModelListen
 			File file=chooser.getSelectedFile();
 			FileInputStream fis=null;
 			
-			
-			
 			try {
 				fis=new FileInputStream(file);
 				
@@ -233,6 +231,8 @@ public class LoadMain extends JFrame implements ActionListener, TableModelListen
 				for(int a=1;a<=total;a++){
 					HSSFRow row=sheet.getRow(a);
 					int columnCount=row.getLastCellNum(); //컬럼의 갯수가 몇개니?
+			
+
 					
 					for(int i=0;i<columnCount;i++){
 						HSSFCell cell=row.getCell(i);
@@ -240,13 +240,18 @@ public class LoadMain extends JFrame implements ActionListener, TableModelListen
 						//System.out.println(cell.getNumericCellValue()); 
 						//하나의 레코드에는 숫자와 문자가 공존하기 때문에 조건을 걸어서 따져보지ㅏ그런데 없어질 getCellType 따라서 자료형에 국한되지않고 모두 String 처리하자
 						String value=df.formatCellValue(cell);
+				
+						data=buffr.readLine();
+						if(data==null)break;
+						
+						String[] value=data.split(",");
+						
 						System.out.print(value); //한줄뽑은거 
 					}
 					System.out.println("");//줄바꾼거
 				}
 				//HSSFRow row=sheet.getRow(0); //한줄가져오기
-				//HSSFCell cell=row.getCell(0);
-						
+				//HSSFCell cell=row.getCell(0);	
 			}
 			catch (FileNotFoundException e) {		
 				e.printStackTrace(); //여기까진 그냥 똑같은데 엑셀은 일반파일이 아니므로 POI이용! 파일먼저- > sheet -> row > cell
@@ -272,9 +277,7 @@ public class LoadMain extends JFrame implements ActionListener, TableModelListen
 			
 			for(int i=0; i<count;i++){
 				columnName.add(meta.getColumnName(i+1));
-				
 			}
-			
 			list = new Vector<Vector>(); //이차원 벡터가 될 예정 
 			while(rs.next()){ //커서 한칸 전진
 		 
@@ -312,15 +315,11 @@ public class LoadMain extends JFrame implements ActionListener, TableModelListen
 			}
 		}
 	}
-	
-	
 	//선택한 레코드 삭제 
 	public void delete(){
 		
 		
-		
 	}
-
 	public void actionPerformed(ActionEvent e) {
 		Object obj=e.getSource();
 
@@ -339,7 +338,6 @@ public class LoadMain extends JFrame implements ActionListener, TableModelListen
 	public void tableChanged(TableModelEvent e) {
 		System.out.println("나바꿨어?");
 	}
-	
 	
 	public static void main(String[] args) {
 		new LoadMain();
