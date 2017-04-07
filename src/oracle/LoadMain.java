@@ -360,7 +360,7 @@ public class LoadMain extends JFrame implements ActionListener, TableModelListen
 			for(int i=0; i<count;i++){
 				columnName.add(meta.getColumnName(i+1));
 			}
-			list = new Vector<Vector>(); //이차원 벡터가 될 예정 
+			list = new Vector<Vector>(); //이차원 벡터가 될 예정 -> 새로운 list (LoadMain것) 얘를 MyModel에 
 			while(rs.next()){ //커서 한칸 전진
 		 
 				Vector vec = new Vector(); //레코드 1건 담을 것 -> DTO 는 JTable 지원 X
@@ -409,7 +409,10 @@ public class LoadMain extends JFrame implements ActionListener, TableModelListen
 				int result=pstmt.executeUpdate(); //쿼리문의 결과가 result
 				if(result!=0){
 					JOptionPane.showMessageDialog(this, "삭제완료");
+					getList();
+					myModel.list=list;
 					table.updateUI(); //테이블갱신
+					
 				}
 			} catch (SQLException e) {
 				// TODO Auto-generated catch block
